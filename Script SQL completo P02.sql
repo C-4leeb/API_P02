@@ -40,10 +40,8 @@ CREATE TABLE cliente (
   nacionalidad VARCHAR(50),
   telefono VARCHAR(20),
   correo VARCHAR(100),
-  ID_pago INT,
   fecha_nacimiento DATE
 );
-
 
 -- Tabla documentos
 CREATE TABLE documentos (
@@ -104,9 +102,14 @@ CREATE TABLE pago (
   FOREIGN KEY (ID_reserva) REFERENCES reserva(ID_reserva)
 );
 --Agregando la relación (1:N) en pago
-ALTER TABLE cliente
-ADD CONSTRAINT fk_pago
-FOREIGN KEY (ID_pago) REFERENCES pago(ID_pago);
+ALTER TABLE pago
+ADD COLUMN documento_identidad VARCHAR(50);
+
+ALTER TABLE pago
+ADD CONSTRAINT fk_pago_cliente
+FOREIGN KEY (documento_identidad) REFERENCES cliente(documento_identidad);
+
+ALTER TABLE pago ADD COLUMN fecha_pago DATE DEFAULT CURRENT_DATE;
 
 -- Tabla servicios
 CREATE TABLE servicios (
@@ -413,3 +416,17 @@ BEGIN
 END;
 $$;
 
+--Datos Necesarios para una reserva
+
+INSERT INTO politicas_reserva (
+    minimo_noches, penalizaciones_cancelación, upgrades_automaticos
+) VALUES (
+    2, '50% si se cancela con menos de 24h', TRUE
+);
+
+
+INSERT INTO eventos (
+    habitacion_VIP, bloqueo_por_eventos, grupos
+) VALUES (
+    FALSE, FALSE, FALSE
+);

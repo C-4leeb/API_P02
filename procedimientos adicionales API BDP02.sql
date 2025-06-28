@@ -146,7 +146,7 @@ BEGIN
 END;
 $$;
 
-CALL sch_reservas_hotel.eliminar_cliente('1122334455');
+
 
 --Filtros opcionales
 CREATE OR REPLACE FUNCTION filtrar_clientes(
@@ -217,17 +217,6 @@ BEGIN
 END;
 $$;
 
-CALL crear_habitacion(
-
-  777,
-  'doble',
-  'al frente de la casa presidencia',
-  'libre',
-  'rosada',
-  'temporada alta',
-  '2x1 para nacionales',
-  120000.00
-);
 
 --Consultar habitacion 
 CREATE OR REPLACE FUNCTION obtener_habitacion(p_id_habitacion INT)
@@ -292,8 +281,7 @@ END;
 $$;
 
 
---Eliminar habitacion
-call eliminar_habitacion();
+
 
 CREATE OR REPLACE PROCEDURE eliminar_habitacion(
     p_id_habitacion INT
@@ -487,14 +475,26 @@ CREATE OR REPLACE PROCEDURE registrar_pago(
 )
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    v_documento_identidad VARCHAR(50);
 BEGIN
+    -- Obtener el documento del cliente asociado a la reserva
+    SELECT documento_identidad
+    INTO v_documento_identidad
+    FROM reserva
+    WHERE ID_reserva = p_id_reserva;
+
+    IF v_documento_identidad IS NULL THEN
+        RAISE EXCEPTION 'No se encontró cliente asociado a la reserva %', p_id_reserva;
+    END IF;
+
     -- Insertar el pago
     INSERT INTO pago (
         tipo_pago, plataformas_integradas, metodo_pago, factura,
-        recibo, reembolso, cargos_extra, ID_reserva
+        recibo, reembolso, cargos_extra, ID_reserva, documento_identidad
     ) VALUES (
         p_tipo_pago, p_plataformas_integradas, p_metodo_pago,
-        p_factura, p_recibo, p_reembolso, p_cargos_extra, p_id_reserva
+        p_factura, p_recibo, p_reembolso, p_cargos_extra, p_id_reserva, v_documento_identidad
     );
 
     -- Actualizar el estado de la reserva
@@ -502,9 +502,82 @@ BEGIN
 END;
 $$;
 
-call crear_servicio(
 
+CREATE OR REPLACE FUNCTION obtener_pago(p_id_pago INT)
+RETURNS TABLE (
+    id_pago INT,
+    tipo_pago VARCHAR,
+    plataformas_integradas VARCHAR,
+    metodo_pago VARCHAR,
+    factura VARCHAR,
+    recibo VARCHAR,
+    reembolso INT,
+    cargos_extra VARCHAR,
+    id_reserva INT,
+    documento_identidad VARCHAR
 )
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.id_pago,
+        p.tipo_pago,
+        p.plataformas_integradas,
+        p.metodo_pago,
+        p.factura,
+        p.recibo,
+        p.reembolso,
+        p.cargos_extra,
+        p.id_reserva,
+        p.documento_identidad
+    FROM pago p
+    WHERE p.id_pago = p_id_pago;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION filtrar_pagos(
+    p_documento_identidad VARCHAR DEFAULT NULL,
+    p_fecha_pago DATE DEFAULT NULL,
+    p_metodo_pago VARCHAR DEFAULT NULL
+)
+RETURNS TABLE (
+    id_pago INT,
+    tipo_pago VARCHAR,
+    plataformas_integradas VARCHAR,
+    metodo_pago VARCHAR,
+    factura VARCHAR,
+    recibo VARCHAR,
+    reembolso INT,
+    cargos_extra VARCHAR,
+    id_reserva INT,
+    documento_identidad VARCHAR,
+    fecha_pago DATE
+)
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.id_pago,
+        p.tipo_pago,
+        p.plataformas_integradas,
+        p.metodo_pago,
+        p.factura,
+        p.recibo,
+        p.reembolso,
+        p.cargos_extra,
+        p.id_reserva,
+        p.documento_identidad,
+        p.fecha_pago
+    FROM pago p
+    WHERE 
+        (p_documento_identidad IS NULL OR p.documento_identidad = p_documento_identidad) AND
+        (p_fecha_pago IS NULL OR p.fecha_pago = p_fecha_pago) AND
+        (p_metodo_pago IS NULL OR p.metodo_pago = p_metodo_pago);
+END;
+$$ LANGUAGE plpgsql;
+
+
 --SERVICIOS
 CREATE OR REPLACE PROCEDURE crear_servicio(
     p_documento_identidad VARCHAR,
